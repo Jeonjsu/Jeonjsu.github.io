@@ -14,7 +14,7 @@ defaults:
     scope:
       path: "" # empty string for all files
     values:
-      title: dbyll
+      title: 전진수의블로그입니다.
 
 description: Stylish Jekyll Theme
 author:
