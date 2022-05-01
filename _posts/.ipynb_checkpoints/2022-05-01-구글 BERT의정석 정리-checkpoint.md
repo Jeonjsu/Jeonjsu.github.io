@@ -1,208 +1,98 @@
 ---
 layout: post
-title: 구글 BERT의 정석 정리 1장
+title: 구글 BERT의 정석 정리 6장
 categories: [NLP]
 tags: [NLP]
-description: transformer 란?
+description: 텍스트 요약/ 추출
 ---
+- 텍스트 요약 / BERT 파인튜닝
+- BERT를 활용한 추출/생성 요약
+- ROUGE 평가지표
 
-1. 트랜스포머 모델에 대한 이해
-    1. 인코더
-    2. 디코더
-    
-     
-    
+### 6.1 텍스트 요약 / 파인튜닝
 
-트랜스포머의 인코더는 n개의 겹으로 이루어져 있으며, 각 인코더는 멀티 헤드 어텐션과 피드포워드 네트워크라는 2개의 블록으로 구성됨
+텍스트 요약은 아래 2개의 TASK로 구분됨
 
-### 1.2 Encoder 이해
+- 추출요약
 
-멀티헤드 어텐션이 어떻게 작동하는지 이해하기 위해 셀프 어텐션을 이해해보자
+전체 문단의 중요 문장만을 추출
 
-1.2.1 셀프 어텐션
+- 생성요약
 
-query, key, value 3개의 행렬이 존재함
+전체 문단중 의역하여 새로운 문장을 생성
 
-만약 I am good 이라는 문장의 각 단어가 512차원이라 하면, 
+### 6.2 BERT 활용한 추출/생성 요약
 
-각 단어들은 (3,512)차원으로 표현되며
+6.2.1 추출요약 (BERTSUM)
 
-각 단어마다 Query, key, value 행렬이 존재하여 (3,3,512) 차원을 가짐
+BERT 모델에 사용하기 위한 INPUT 데이터 형태 이며 문장별 시작부분에 CLS를 추가
 
-셀프어텐션은 문장의 모든단어들 각각이 어떤 영향을 미치는지 파악하는 것 임
+입력 : [CLS] Paris is a beatiful city [SEP] [CLS] I love Paris [SEP]
 
-4단계가 존재하는데
+토큰 : E_cls + E_paris ...                                             + E_sep
 
-1. Q dot K^t 
-    1. 각 단어들간 유사도를 구하는 과정
-2. square(d_k)로 결과 나눔
-    1. 유사도의 안정적인 Gradient 계산
-3. 2의 결과에 softmax값 계산
-    1. 확률적으로 표현 ( 단어마다 유사도가 나옴)
-4. 3의 결과에 Value 내적하여 최종적인 attention score 구함
-    
-    I am good이라는 단어는
-    
-    I의 3개 단어의 유사도들과 각 단어가 가지는 value 벡터의 내적합임
-    
-    z 벡터 계산
-    
+세그 : E_A + E_A +                               +E_B +         + E_B
 
-1.2.2 멀티 헤드 어텐션
+위치 : E_0 + E_1 +                                                    + E_10
 
-셀프어텐션은 단일의 z벡터로 구성되어 있다면, 
+위 3가지 종류의 벡터값들이 트랜스포머 인코더를 통과하여 
 
-멀티 헤드 어텐션은 다중의 z 벡터로 구성된 형태임
+출력 : R_[CLS] , R_Paris , ...   R_[SEP] 값을 출력하고
 
-하나의 벡터보단 다중 벡터가 단어간 유사도를 구하는데 더욱 정확할 것 이라는 가정
+전체문장이 담겨있는 R_[CLS] 벡터를 이진분류 함. 이 벡터값들이 아래의 input값으로 활용
 
-결국 Concatenate(Z0 .. Zh) * W0 를 구하면 최종적으로 어텐션 스코어가 계산됨
+분류기에 트랜스포머 / LSTM 을 활용 가능함
 
-*W0를 곱하는 이유는 멀티헤드여서 h배가 되는데 이를 1개로 줄이기 위함임
+트랜스포머
 
-1.2.3 위치 인코딩
+- L개의 트랜스포머 인코더의 마지막 출력값의 hidden layer h^L 을 이진분류기에 통과
 
-트랜스포머의 경우 병렬적으로 학습되는데, 단어는 순차적으로 구성되는 특징이 있음
+LSTM
 
-네트워크에서 문장의 의미를 잘 이해할 수 있도록 단어의 위치를 표현하는 정보를 추가 제공해야함
+- LSTM 을 통과시켜 각 문장별 hidden layer를 얻고, 각각을 이진분류기에 통과
 
-이때 사용되는 것이 positional encoding임
+6.2.2 생성요약 (BERTSUMABS , bert for abstactive summarization)
 
-저자는  사인파 함수(sinusoidal function) 를 사용함.
+- 트랜스 포머의 인코더 디코더 구조 사용
+- 인코더 - BERTSUM , 디코더 - 무작위로 초기화됨
+    - 인코더 , 디코더의 optimizer를 구분하여 사용
+    - 인코더는 lr 작게, 디코더는 lr 크게
 
-단어의 입력 벡터 X에 포지션 인코딩 P를 더해서 input으로 사용
+참고) [https://wikidocs.net/31379](https://wikidocs.net/31379)
 
-1.2.4 피드포워드 네트워크
+### 6.3 ROUGE 평가지표
 
-2개의 dense layer와 1개의 relu층으로 구성됨
+텍스트 요약 태스트 평가 지표 ROUGE(Recall-Oriented Understudy for Gisting Evaluation)
 
-1.2.5 add와 norm
+- ROUGE-N
+- ROUGE-L
 
-멀티헤드 어텐션 → add&norm → 피드포워드 네트워크 → add&norm 의 순서로 구성됨
+6.3.1 ROUGE-N 이해
 
-정규화와 잔차연결의 역할이며 정규화는 각 레이어값이 크게 변화하는 경우를 방지하여 모델을 더 빠르게 학습 하도록 함
+후보요약 (예측한 요약) 과 참조요약 (실제요약) 간의 n-gram 재현율
 
- 
+재현율  = 겹치는 n-gram 수 / 참조요약의 n-gram 수
 
-1.2.6 인코딩 과정 종합
+후보요약(예측) - Machine learning is seen as a subset of artificial intelligence.
 
-1. 각 문장의 벡터에 positional 벡터의 가중치가 더해진 값이 첫번째 encoder의 input
-2. 첫번째 encoder에서 멀티헤드 어텐션을 통해계산된 score가 피드포워드 네트워크를 통해 임베딩됨
-3. 첫번째 encoder에서 임베딩된 값이 두번째 encoder의 input으로 사용됨
-4. 동일한 과정이 인코더 수 N번만큼 반복됨
+참조요약(실제) - Machine learning is a subset of artificial intelligence.    
 
-위 결과를 통해 계산된 최종적인 인코딩을 R이라고 둠
+Rouge 2를 계산하면 
 
-### 1.3 Decoder 이해
+후보요약 : (machine , learning ) ( learning is )  ... ( artificial intelligence) 
 
-I am good → Je vais bien 으로 번역되는 과정을 살펴보자
+참조요약 : (machine , learning ) (learning is ) ... (artificial intelligence) 
 
-디코더의 Input은 인코더의 R과 timestep 별 target의 단어들이 순차적으로 들어가는데,
+6/7 이 계산됨
 
-t=0에선 문장의 시작을 보여주는 <sos> 이고 output은 다음 단어인 Je
+6.3.2 ROUGE-L 이해
 
-t=1의 input은 <sos> Je 이고 output은 Je vais
+가장 긴 공통시퀀스 LCS ( longest common subsequence )를 사용함
 
-t=2의 input은 <sos> Je vais이고 output은 Je vais bien
+$R_{lcs} = \frac{LCS(후보,참조)}{참조요약의 전체 단어 수}$ 
 
-t=3의 input은 <sos> Je vais bien 이고 output은 Je vais bien <eos> 임
+$P_{lcs} = \frac{LCS(후보, 참조)}{후보요약의 전체 단어 수}$
 
-디코더 역시 N개의 디코더의 누적값이 존재
+$F_{lcs} = \frac{(1+b^2)RP}{R+b^2P}$
 
-디코더의 input역시 positional encoding값이 더해짐
-
-디코더는 3개의 블록 (마스크된 멀티헤드 어텐션, 멀티 헤드 어텐션, 피드 포워드)로 구성됨
-
-인코더에서 추가된 마스크된 멀티헤드 어텐션에 대해 확인해보자
-
-1.3.1 마스크된 멀티 헤드 어텐션
-
-셀프어텐션은 문장에서 사용된 전체 단어들간 관계가 계산된다
-
-하지만 디코더에서는 Timestep마다 사용되는 단어가 제한된다
-
-예를들어
-
-첫번째 step에서는 <sos>만 input으로 사용되고, 다른 단어는 확인이 되지 않으므로 masking한다.
-
-두번째 step에서는 <sos> 와 Je만 input으로 사용되고 , 나머지 단어는 masking 한다.
-
-이를통해 입력되는 단어에만 집중하여 단어를 정확히 생성함
-
-mask하는 방식은 셀프어텐션에서 softmax함수를 적용 후 timestep을 고려하여 mask 되는 부분은 매우 작은 수(e-9)로 지정함
-
-그 후 이전과 마찬가지로 밸류 행렬에 곱해 어텐션행렬을 구하고,
-
-멀티헤드 어텐션 M 의 경우 concatenate(Z1, ... , Zh) 에 W0를 곱하여 계산한다.
-
-이렇게 계산된 행렬은 멀티 헤드 어텐션의 input으로 사용된다.
-
-1.3.2 멀티 헤드 어텐션
-
-디코더의 멀티 헤드 어텐션의 경우 input으로 아래 2개의 값을 받음
-
-1. 인코더의 R
-2. 마스크된 멀티 헤드 어텐션의 스코어 M
-
-여기서 인코더와 디코더의 상호작용이 발생하며 인코더-디코더 어텐션 레이어 라고 부른다.
-
-디코더의 멀티헤드어텐션 레이어가 작동하는 과정을 보면
-
-이전과 마찬가지로 query, key, value 행렬을 생성한다. 이때,
-
-query에서는 행렬 M을 사용하고 key,value에서는 행렬 R을 사용함*
-
-*(query = M * Wq  , key = R * Wk, value = R*Wv)
-
-query는 target 문장의 표현을 포함하여, target 문장에 대한 값인 M을 참조.
-
-key, value는 입력문장의 표현을 가져서 R을 참조
-
-셀프헤드 어텐션에서 첫번째 query와 key 행렬을 내적하는데 그결과
-
-target 단어와 입력 단어간의 유사도를 계산할 수 있다.
-
-그 후 softmax(QK^t /  square(d_t) ) 를 계산 후 value 행렬과 내적하면 어텐션 score가 계산 된다.
-
-이 score의 구성은 target값이 input값의 가중치를 기반으로 한다.
-
-최종적으로 멀티헤드어텐션은 concatenate(Z1, ... , Zh) 에 W0를 곱하여 계산함
-
-1.3.3 피드포워드 네트워크
-
-인코더와 동일함
-
-1.3.4 add와 norm
-
-인코더와 동일함
-
-1.3.5 선형과 소프트맥스 레이어
-
-최상위 디코더에서 얻은 출력값을 선형 및 소프트맥스 레이어에 전달
-
-선형 레이어의 경우 그 크기가 vocabulary와 동일한 크기의 logit 형태임
-
-소프트맥스 함수를 사용해 logit값을 확률로 변환 후 디코더에서 가장 높은 확률값을 갖는 index의 단어로 출력
-
-vocabulary = [bien, Je, vais] 라 하자.
-
-예를들어 timestep2에서 input이 <sos>와 Je이면
-
-디코더의 출력값은 vocabulary의 크기와 동일한 [45,40,49] 값을 가지며
-
-소프트맥스를 통해 [0.0179, 0.000, 0.981] 의 확률값을 가지며 가장 높은 vais가 예측됨
-
-1.3.6 디코더 값 정리
-
-1. 디코더의 입력값을 임베딩 후 positional encoding 정보를 추가
-2. 마스크된 멀티헤드 어텐션 M 계산
-3. M을 통해 멀티헤드 어텐션 query 계산
-4. 
-
-1.4 트랜스포머
-
-위 인코더와 디코더가 합쳐진 형태
-
-1.5 트랜스포머 학습
-
-손실함수를 최소화 하도록. 예측확률분포와 실제 확률분포간 차이를 최소화 해야함. Cross entropy 사용가능. optimizer로는 아담. overfitting 없애기 위해 드롭아웃 적용가능
+참고 ) [https://huffon.github.io/2019/12/07/rouge/](https://huffon.github.io/2019/12/07/rouge/)
