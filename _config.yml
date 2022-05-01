@@ -7,8 +7,7 @@ highlighter: rouge
 markdown: kramdown
 disqus: 전진수
 google_analytics: dbyll
-title: 데이터분석 일상
-
+title: 전 진수입니다.
 defaults:
   -
     scope:
